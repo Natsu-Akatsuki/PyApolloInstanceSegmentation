@@ -69,8 +69,7 @@ enum MetaType {
   MAX_META_TYPE
 };
 
-struct Obstacle
-{
+struct Obstacle {
   std::vector<int> grids;
   pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_ptr;
   float score;
@@ -79,35 +78,32 @@ struct Obstacle
   MetaType meta_type;
   std::vector<float> meta_type_probs;
 
-  Obstacle() : score(0.0), height(-5.0), heading(0.0), meta_type(META_UNKNOWN)
-  {
-    cloud_ptr.reset(new pcl::PointCloud<pcl::PointXYZI>);
+  Obstacle() : score(0.0), height(-5.0), heading(0.0), meta_type(META_UNKNOWN) {
+    cloud_ptr.reset(new pcl::PointCloud <pcl::PointXYZI>);
     meta_type_probs.assign(MAX_META_TYPE, 0.0);
   }
 };
 
-class Cluster2D
-{
+class Cluster2D {
 public:
   Cluster2D(const int rows, const int cols, const float range);
 
   ~Cluster2D() {}
 
   void cluster(
-    const std::shared_ptr<float> & inferred_data,
-    const pcl::PointCloud<pcl::PointXYZI>::Ptr & pc_ptr, const pcl::PointIndices & valid_indices,
-    float objectness_thresh, bool use_all_grids_for_clustering);
+      const std::shared_ptr<float> &inferred_data,
+      const pcl::PointCloud<pcl::PointXYZI>::Ptr &pc_ptr, const pcl::PointIndices &valid_indices,
+      float objectness_thresh, bool use_all_grids_for_clustering);
 
-  void filter(const std::shared_ptr<float> & inferred_data);
-  void classify(const std::shared_ptr<float> & inferred_data);
+  void filter(const std::shared_ptr<float> &inferred_data);
+  void classify(const std::shared_ptr<float> &inferred_data);
 
   void getObjects(
-    const float confidence_thresh, const float height_thresh, const int min_pts_num,
-    tier4_perception_msgs::msg::DetectedObjectsWithFeature & objects,
-    const std_msgs::msg::Header & in_header);
-
+      const float confidence_thresh, const float height_thresh, const int min_pts_num,
+      tier4_perception_msgs::msg::DetectedObjectsWithFeature &objects,
+      const std_msgs::msg::Header &in_header);
   tier4_perception_msgs::msg::DetectedObjectWithFeature obstacleToObject(
-    const Obstacle & in_obstacle, const std_msgs::msg::Header & in_header);
+      const Obstacle &in_obstacle, const std_msgs::msg::Header &in_header);
 
 private:
   int rows_;
@@ -118,16 +114,15 @@ private:
   float inv_res_x_;
   float inv_res_y_;
   std::vector<int> point2grid_;
-  std::vector<Obstacle> obstacles_;
+  std::vector <Obstacle> obstacles_;
   std::vector<int> id_img_;
 
   pcl::PointCloud<pcl::PointXYZI>::Ptr pc_ptr_;
-  const std::vector<int> * valid_indices_in_pc_ = nullptr;
+  const std::vector<int> *valid_indices_in_pc_ = nullptr;
 
-  struct Node
-  {
-    Node * center_node;
-    Node * parent;
+  struct Node {
+    Node *center_node;
+    Node *parent;
     char node_rank;
     char traversed;
     bool is_center;
@@ -135,8 +130,7 @@ private:
     int point_num;
     int obstacle_id;
 
-    Node()
-    {
+    Node() {
       center_node = nullptr;
       parent = nullptr;
       node_rank = 0;
@@ -156,7 +150,7 @@ private:
 
   inline int RowCol2Grid(int row, int col) const { return row * cols_ + col; }
 
-  void traverse(Node * x);
+  void traverse(Node *x);
 };
 
 #endif  // LIDAR_APOLLO_INSTANCE_SEGMENTATION__CLUSTER2D_HPP_

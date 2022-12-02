@@ -20,15 +20,14 @@
 #include <tier4_autoware_utils/system/stop_watch.hpp>
 
 LidarInstanceSegmentationNode::LidarInstanceSegmentationNode(
-  const rclcpp::NodeOptions & node_options)
-: Node("lidar_apollo_instance_segmentation_node", node_options)
-{
+    const rclcpp::NodeOptions &node_options)
+    : Node("lidar_apollo_instance_segmentation_node", node_options) {
   using std::placeholders::_1;
   // initialize debug tool
   {
     using tier4_autoware_utils::DebugPublisher;
     using tier4_autoware_utils::StopWatch;
-    stop_watch_ptr_ = std::make_unique<StopWatch<std::chrono::milliseconds>>();
+    stop_watch_ptr_ = std::make_unique < StopWatch < std::chrono::milliseconds >> ();
     debug_publisher_ = std::make_unique<DebugPublisher>(this, "lidar_apollo_instance_segmentation");
     stop_watch_ptr_->tic("cyclic_time");
     stop_watch_ptr_->tic("processing_time");
@@ -36,16 +35,15 @@ LidarInstanceSegmentationNode::LidarInstanceSegmentationNode(
   detector_ptr_ = std::make_shared<LidarApolloInstanceSegmentation>(this);
   debugger_ptr_ = std::make_shared<Debugger>(this);
   pointcloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-    "input/pointcloud", rclcpp::SensorDataQoS().keep_last(1),
-    std::bind(&LidarInstanceSegmentationNode::pointCloudCallback, this, _1));
+      "input/pointcloud", rclcpp::SensorDataQoS().keep_last(1),
+      std::bind(&LidarInstanceSegmentationNode::pointCloudCallback, this, _1));
   dynamic_objects_pub_ =
-    this->create_publisher<tier4_perception_msgs::msg::DetectedObjectsWithFeature>(
-      "output/labeled_clusters", rclcpp::QoS{1});
+      this->create_publisher<tier4_perception_msgs::msg::DetectedObjectsWithFeature>(
+          "output/labeled_clusters", rclcpp::QoS{1});
 }
 
 void LidarInstanceSegmentationNode::pointCloudCallback(
-  const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg)
-{
+    const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg) {
   stop_watch_ptr_->toc("processing_time", true);
   tier4_perception_msgs::msg::DetectedObjectsWithFeature output_msg;
   detector_ptr_->detectDynamicObjects(*msg, output_msg);
@@ -57,11 +55,8 @@ void LidarInstanceSegmentationNode::pointCloudCallback(
     const double cyclic_time_ms = stop_watch_ptr_->toc("cyclic_time", true);
     const double processing_time_ms = stop_watch_ptr_->toc("processing_time", true);
     debug_publisher_->publish<tier4_debug_msgs::msg::Float64Stamped>(
-      "debug/cyclic_time_ms", cyclic_time_ms);
+        "debug/cyclic_time_ms", cyclic_time_ms);
     debug_publisher_->publish<tier4_debug_msgs::msg::Float64Stamped>(
-      "debug/processing_time_ms", processing_time_ms);
+        "debug/processing_time_ms", processing_time_ms);
   }
 }
-
-#include <rclcpp_components/register_node_macro.hpp>
-RCLCPP_COMPONENTS_REGISTER_NODE(LidarInstanceSegmentationNode)

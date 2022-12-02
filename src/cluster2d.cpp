@@ -56,15 +56,13 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #endif
 
-geometry_msgs::msg::Quaternion getQuaternionFromRPY(const double r, const double p, const double y)
-{
+geometry_msgs::msg::Quaternion getQuaternionFromRPY(const double r, const double p, const double y) {
   tf2::Quaternion q;
   q.setRPY(r, p, y);
   return tf2::toMsg(q);
 }
 
-Cluster2D::Cluster2D(const int rows, const int cols, const float range)
-{
+Cluster2D::Cluster2D(const int rows, const int cols, const float range) {
   rows_ = rows;
   cols_ = cols;
   siz_ = rows * cols;
@@ -78,9 +76,8 @@ Cluster2D::Cluster2D(const int rows, const int cols, const float range)
   valid_indices_in_pc_ = nullptr;
 }
 
-void Cluster2D::traverse(Node * x)
-{
-  std::vector<Node *> p;
+void Cluster2D::traverse(Node *x) {
+  std::vector < Node * > p;
   p.clear();
 
   while (x->traversed == 0) {
@@ -95,31 +92,30 @@ void Cluster2D::traverse(Node * x)
     x->is_center = true;
   }
   for (size_t i = 0; i < p.size(); i++) {
-    Node * y = p[i];
+    Node *y = p[i];
     y->traversed = 1;
     y->parent = x->parent;
   }
 }
 
 void Cluster2D::cluster(
-  const std::shared_ptr<float> & inferred_data, const pcl::PointCloud<pcl::PointXYZI>::Ptr & pc_ptr,
-  const pcl::PointIndices & valid_indices, float objectness_thresh,
-  bool use_all_grids_for_clustering)
-{
-  const float * category_pt_data = inferred_data.get();
-  const float * instance_pt_x_data = inferred_data.get() + siz_;
-  const float * instance_pt_y_data = inferred_data.get() + siz_ * 2;
+    const std::shared_ptr<float> &inferred_data, const pcl::PointCloud<pcl::PointXYZI>::Ptr &pc_ptr,
+    const pcl::PointIndices &valid_indices, float objectness_thresh,
+    bool use_all_grids_for_clustering) {
+  const float *category_pt_data = inferred_data.get();
+  const float *instance_pt_x_data = inferred_data.get() + siz_;
+  const float *instance_pt_y_data = inferred_data.get() + siz_ * 2;
 
   pc_ptr_ = pc_ptr;
 
-  std::vector<std::vector<Node>> nodes(rows_, std::vector<Node>(cols_, Node()));
+  std::vector <std::vector<Node>> nodes(rows_, std::vector<Node>(cols_, Node()));
 
   valid_indices_in_pc_ = &(valid_indices.indices);
   point2grid_.assign(valid_indices_in_pc_->size(), -1);
 
   for (size_t i = 0; i < valid_indices_in_pc_->size(); ++i) {
     int point_id = valid_indices_in_pc_->at(i);
-    const auto & point = pc_ptr_->points[point_id];
+    const auto &point = pc_ptr_->points[point_id];
     // * the coordinates of x and y have been exchanged in feature generation
     // step,
     // so we swap them back here.
@@ -134,10 +130,10 @@ void Cluster2D::cluster(
   for (int row = 0; row < rows_; ++row) {
     for (int col = 0; col < cols_; ++col) {
       int grid = RowCol2Grid(row, col);
-      Node * node = &nodes[row][col];
+      Node *node = &nodes[row][col];
       DisjointSetMakeSet(node);
       node->is_object = (use_all_grids_for_clustering || nodes[row][col].point_num > 0) &&
-                        (*(category_pt_data + grid) >= objectness_thresh);
+          (*(category_pt_data + grid) >= objectness_thresh);
       int center_row = std::round(row + instance_pt_x_data[grid] * scale_);
       int center_col = std::round(col + instance_pt_y_data[grid] * scale_);
       center_row = std::min(std::max(center_row, 0), rows_ - 1);
@@ -148,7 +144,7 @@ void Cluster2D::cluster(
 
   for (int row = 0; row < rows_; ++row) {
     for (int col = 0; col < cols_; ++col) {
-      Node * node = &nodes[row][col];
+      Node *node = &nodes[row][col];
       if (node->is_object && node->traversed == 0) {
         traverse(node);
       }
@@ -157,14 +153,14 @@ void Cluster2D::cluster(
 
   for (int row = 0; row < rows_; ++row) {
     for (int col = 0; col < cols_; ++col) {
-      Node * node = &nodes[row][col];
+      Node *node = &nodes[row][col];
       if (!node->is_center) {
         continue;
       }
       for (int row2 = row - 1; row2 <= row + 1; ++row2) {
         for (int col2 = col - 1; col2 <= col + 1; ++col2) {
           if ((row2 == row || col2 == col) && IsValidRowCol(row2, col2)) {
-            Node * node2 = &nodes[row2][col2];
+            Node *node2 = &nodes[row2][col2];
             if (node2->is_center) {
               DisjointSetUnion(node, node2);
             }
@@ -179,11 +175,11 @@ void Cluster2D::cluster(
   id_img_.assign(siz_, -1);
   for (int row = 0; row < rows_; ++row) {
     for (int col = 0; col < cols_; ++col) {
-      Node * node = &nodes[row][col];
+      Node *node = &nodes[row][col];
       if (!node->is_object) {
         continue;
       }
-      Node * root = DisjointSetFind(node);
+      Node *root = DisjointSetFind(node);
       if (root->obstacle_id < 0) {
         root->obstacle_id = count_obstacles++;
         obstacles_.push_back(Obstacle());
@@ -197,15 +193,14 @@ void Cluster2D::cluster(
   classify(inferred_data);
 }
 
-void Cluster2D::filter(const std::shared_ptr<float> & inferred_data)
-{
-  const float * confidence_pt_data = inferred_data.get() + siz_ * 3;
-  const float * heading_pt_x_data = inferred_data.get() + siz_ * 9;
-  const float * heading_pt_y_data = inferred_data.get() + siz_ * 10;
-  const float * height_pt_data = inferred_data.get() + siz_ * 11;
+void Cluster2D::filter(const std::shared_ptr<float> &inferred_data) {
+  const float *confidence_pt_data = inferred_data.get() + siz_ * 3;
+  const float *heading_pt_x_data = inferred_data.get() + siz_ * 9;
+  const float *heading_pt_y_data = inferred_data.get() + siz_ * 10;
+  const float *height_pt_data = inferred_data.get() + siz_ * 11;
 
   for (size_t obstacle_id = 0; obstacle_id < obstacles_.size(); obstacle_id++) {
-    Obstacle * obs = &obstacles_[obstacle_id];
+    Obstacle *obs = &obstacles_[obstacle_id];
     double score = 0.0;
     double height = 0.0;
     double vec_x = 0.0;
@@ -219,16 +214,15 @@ void Cluster2D::filter(const std::shared_ptr<float> & inferred_data)
     obs->score = score / static_cast<double>(obs->grids.size());
     obs->height = height / static_cast<double>(obs->grids.size());
     obs->heading = std::atan2(vec_y, vec_x) * 0.5;
-    obs->cloud_ptr.reset(new pcl::PointCloud<pcl::PointXYZI>);
+    obs->cloud_ptr.reset(new pcl::PointCloud <pcl::PointXYZI>);
   }
 }
 
-void Cluster2D::classify(const std::shared_ptr<float> & inferred_data)
-{
-  const float * classify_pt_data = inferred_data.get() + siz_ * 4;
+void Cluster2D::classify(const std::shared_ptr<float> &inferred_data) {
+  const float *classify_pt_data = inferred_data.get() + siz_ * 4;
   int num_classes = 5;
   for (size_t obs_id = 0; obs_id < obstacles_.size(); obs_id++) {
-    Obstacle * obs = &obstacles_[obs_id];
+    Obstacle *obs = &obstacles_[obs_id];
 
     for (size_t grid_id = 0; grid_id < obs->grids.size(); grid_id++) {
       int grid = obs->grids[grid_id];
@@ -248,8 +242,7 @@ void Cluster2D::classify(const std::shared_ptr<float> & inferred_data)
 }
 
 tier4_perception_msgs::msg::DetectedObjectWithFeature Cluster2D::obstacleToObject(
-  const Obstacle & in_obstacle, const std_msgs::msg::Header & in_header)
-{
+    const Obstacle &in_obstacle, const std_msgs::msg::Header &in_header) {
   using autoware_auto_perception_msgs::msg::DetectedObjectKinematics;
   using autoware_auto_perception_msgs::msg::ObjectClassification;
 
@@ -257,9 +250,9 @@ tier4_perception_msgs::msg::DetectedObjectWithFeature Cluster2D::obstacleToObjec
   // pcl::PointCloud<pcl::PointXYZI> in_cluster = *(in_obstacle.cloud_ptr);
 
   resulting_object.object.classification.emplace_back(
-    autoware_auto_perception_msgs::build<ObjectClassification>()
-      .label(ObjectClassification::UNKNOWN)
-      .probability(in_obstacle.score));
+      autoware_auto_perception_msgs::build<ObjectClassification>()
+          .label(ObjectClassification::UNKNOWN)
+          .probability(in_obstacle.score));
   if (in_obstacle.meta_type == MetaType::META_PEDESTRIAN) {
     resulting_object.object.classification.front().label = ObjectClassification::PEDESTRIAN;
   } else if (in_obstacle.meta_type == MetaType::META_NON_MOT) {
@@ -298,7 +291,7 @@ tier4_perception_msgs::msg::DetectedObjectWithFeature Cluster2D::obstacleToObjec
   }
 
   // cluster and ground filtering
-  pcl::PointCloud<pcl::PointXYZI> cluster;
+  pcl::PointCloud <pcl::PointXYZI> cluster;
   const float min_height = min_point.z + ((max_point.z - min_point.z) * 0.1f);
   for (auto pit = in_obstacle.cloud_ptr->points.begin(); pit != in_obstacle.cloud_ptr->points.end();
        ++pit) {
@@ -326,24 +319,23 @@ tier4_perception_msgs::msg::DetectedObjectWithFeature Cluster2D::obstacleToObjec
   const float length = max_point.x - min_point.x;
   const float width = max_point.y - min_point.y;
   resulting_object.object.kinematics.pose_with_covariance.pose.position.x =
-    min_point.x + length / 2;
+      min_point.x + length / 2;
   resulting_object.object.kinematics.pose_with_covariance.pose.position.y = min_point.y + width / 2;
   resulting_object.object.kinematics.pose_with_covariance.pose.position.z =
-    min_point.z + height / 2;
+      min_point.z + height / 2;
 
   resulting_object.object.kinematics.pose_with_covariance.pose.orientation =
-    getQuaternionFromRPY(0.0, 0.0, in_obstacle.heading);
+      getQuaternionFromRPY(0.0, 0.0, in_obstacle.heading);
   resulting_object.object.kinematics.orientation_availability =
-    DetectedObjectKinematics::SIGN_UNKNOWN;
+      DetectedObjectKinematics::SIGN_UNKNOWN;
 
   return resulting_object;
 }
 
 void Cluster2D::getObjects(
-  const float confidence_thresh, const float height_thresh, const int min_pts_num,
-  tier4_perception_msgs::msg::DetectedObjectsWithFeature & objects,
-  const std_msgs::msg::Header & in_header)
-{
+    const float confidence_thresh, const float height_thresh, const int min_pts_num,
+    tier4_perception_msgs::msg::DetectedObjectsWithFeature &objects,
+    const std_msgs::msg::Header &in_header) {
   for (size_t i = 0; i < point2grid_.size(); ++i) {
     int grid = point2grid_[i];
     if (grid < 0) {
@@ -356,20 +348,20 @@ void Cluster2D::getObjects(
 
     if (obstacle_id >= 0 && obstacles_[obstacle_id].score >= confidence_thresh) {
       if (
-        height_thresh < 0 ||
-        pc_ptr_->points[point_id].z <= obstacles_[obstacle_id].height + height_thresh) {
+          height_thresh < 0 ||
+              pc_ptr_->points[point_id].z <= obstacles_[obstacle_id].height + height_thresh) {
         obstacles_[obstacle_id].cloud_ptr->push_back(pc_ptr_->points[point_id]);
       }
     }
   }
 
   for (size_t obstacle_id = 0; obstacle_id < obstacles_.size(); obstacle_id++) {
-    Obstacle * obs = &obstacles_[obstacle_id];
+    Obstacle *obs = &obstacles_[obstacle_id];
     if (static_cast<int>(obs->cloud_ptr->size()) < min_pts_num) {
       continue;
     }
     tier4_perception_msgs::msg::DetectedObjectWithFeature out_obj =
-      obstacleToObject(*obs, in_header);
+        obstacleToObject(*obs, in_header);
     objects.feature_objects.push_back(out_obj);
   }
   objects.header = in_header;

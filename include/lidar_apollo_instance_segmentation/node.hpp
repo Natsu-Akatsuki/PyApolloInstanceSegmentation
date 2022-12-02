@@ -23,28 +23,26 @@
 
 #include <memory>
 
-class LidarInstanceSegmentationInterface
-{
+class LidarInstanceSegmentationInterface {
 public:
   LidarInstanceSegmentationInterface() {}
   virtual ~LidarInstanceSegmentationInterface() {}
   virtual bool detectDynamicObjects(
-    const sensor_msgs::msg::PointCloud2 & input,
-    tier4_perception_msgs::msg::DetectedObjectsWithFeature & output) = 0;
+      const sensor_msgs::msg::PointCloud2 &input,
+      tier4_perception_msgs::msg::DetectedObjectsWithFeature &output) = 0;
 };
 
-class LidarInstanceSegmentationNode : public rclcpp::Node
-{
+class LidarInstanceSegmentationNode : public rclcpp::Node {
 private:
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_sub_;
   rclcpp::Publisher<tier4_perception_msgs::msg::DetectedObjectsWithFeature>::SharedPtr
-    dynamic_objects_pub_;
-  std::shared_ptr<LidarInstanceSegmentationInterface> detector_ptr_;
-  std::shared_ptr<Debugger> debugger_ptr_;
+      dynamic_objects_pub_;
+  std::shared_ptr <LidarInstanceSegmentationInterface> detector_ptr_;
+  std::shared_ptr <Debugger> debugger_ptr_;
   void pointCloudCallback(const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg);
-  std::unique_ptr<tier4_autoware_utils::StopWatch<std::chrono::milliseconds>> stop_watch_ptr_;
-  std::unique_ptr<tier4_autoware_utils::DebugPublisher> debug_publisher_;
+  std::unique_ptr <tier4_autoware_utils::StopWatch<std::chrono::milliseconds>> stop_watch_ptr_;
+  std::unique_ptr <tier4_autoware_utils::DebugPublisher> debug_publisher_;
 
 public:
-  explicit LidarInstanceSegmentationNode(const rclcpp::NodeOptions & node_options);
+  explicit LidarInstanceSegmentationNode(const rclcpp::NodeOptions &node_options);
 };

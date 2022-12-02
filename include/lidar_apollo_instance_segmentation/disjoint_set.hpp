@@ -17,43 +17,38 @@
 #ifndef LIDAR_APOLLO_INSTANCE_SEGMENTATION__DISJOINT_SET_HPP_
 #define LIDAR_APOLLO_INSTANCE_SEGMENTATION__DISJOINT_SET_HPP_
 
-template <class T>
-void DisjointSetMakeSet(T * x)
-{
+template<class T>
+void DisjointSetMakeSet(T *x) {
   x->parent = x;
   x->node_rank = 0;
 }
 
-template <class T>
-T * DisjointSetFindRecursive(T * x)
-{
+template<class T>
+T *DisjointSetFindRecursive(T *x) {
   if (x->parent != x) {
     x->parent = DisjointSetFindRecursive(x->parent);
   }
   return x->parent;
 }
 
-template <class T>
-T * DisjointSetFind(T * x)
-{
-  T * y = x->parent;
+template<class T>
+T *DisjointSetFind(T *x) {
+  T *y = x->parent;
   if (y == x || y->parent == y) {
     return y;
   }
-  T * root = DisjointSetFindRecursive(y->parent);
+  T *root = DisjointSetFindRecursive(y->parent);
   x->parent = root;
   y->parent = root;
   return root;
 }
 
-template <class T>
-void DisjointSetMerge([[maybe_unused]] T * x, [[maybe_unused]] const T * y)
-{
+template<class T>
+void DisjointSetMerge([[maybe_unused]] T *x, [[maybe_unused]] const T *y) {
 }
 
-template <class T>
-void DisjointSetUnion(T * x, T * y)
-{
+template<class T>
+void DisjointSetUnion(T *x, T *y) {
   x = DisjointSetFind(x);
   y = DisjointSetFind(y);
   if (x == y) {

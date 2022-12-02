@@ -32,24 +32,23 @@
 #include <memory>
 #include <string>
 
-class LidarApolloInstanceSegmentation : public LidarInstanceSegmentationInterface
-{
+class LidarApolloInstanceSegmentation : public LidarInstanceSegmentationInterface {
 public:
-  explicit LidarApolloInstanceSegmentation(rclcpp::Node * node);
+  explicit LidarApolloInstanceSegmentation(rclcpp::Node *node);
   ~LidarApolloInstanceSegmentation() {}
   bool detectDynamicObjects(
-    const sensor_msgs::msg::PointCloud2 & input,
-    tier4_perception_msgs::msg::DetectedObjectsWithFeature & output) override;
+      const sensor_msgs::msg::PointCloud2 &input,
+      tier4_perception_msgs::msg::DetectedObjectsWithFeature &output) override;
 
 private:
   bool transformCloud(
-    const sensor_msgs::msg::PointCloud2 & input, sensor_msgs::msg::PointCloud2 & transformed_cloud,
-    float z_offset);
+      const sensor_msgs::msg::PointCloud2 &input, sensor_msgs::msg::PointCloud2 &transformed_cloud,
+      float z_offset);
 
-  rclcpp::Node * node_;
-  std::unique_ptr<Tn::trtNet> net_ptr_;
-  std::shared_ptr<Cluster2D> cluster2d_;
-  std::shared_ptr<FeatureGenerator> feature_generator_;
+  rclcpp::Node *node_;
+  std::unique_ptr <Tn::trtNet> net_ptr_;
+  std::shared_ptr <Cluster2D> cluster2d_;
+  std::shared_ptr <FeatureGenerator> feature_generator_;
   float score_threshold_;
 
   tf2_ros::Buffer tf_buffer_;

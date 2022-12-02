@@ -22,21 +22,20 @@
 
 #include <memory>
 
-class FeatureGenerator
-{
+class FeatureGenerator {
 private:
   float min_height_;
   float max_height_;
   bool use_intensity_feature_;
   bool use_constant_feature_;
-  std::shared_ptr<FeatureMapInterface> map_ptr_;
+  std::shared_ptr <FeatureMapInterface> map_ptr_;
 
 public:
   FeatureGenerator(
-    const int width, const int height, const int range, const bool use_intensity_feature,
-    const bool use_constant_feature);
+      const int width, const int height, const int range, const bool use_intensity_feature,
+      const bool use_constant_feature);
   ~FeatureGenerator() {}
 
-  std::shared_ptr<FeatureMapInterface> generate(
-    const pcl::PointCloud<pcl::PointXYZI>::Ptr & pc_ptr);
+  std::shared_ptr <FeatureMapInterface> generate(
+      const pcl::PointCloud<pcl::PointXYZI>::Ptr &pc_ptr);
 };

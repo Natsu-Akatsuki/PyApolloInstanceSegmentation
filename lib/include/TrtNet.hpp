@@ -36,22 +36,19 @@
 #include <string>
 #include <vector>
 
-namespace Tn
-{
+namespace Tn {
 enum class RUN_MODE { FLOAT32 = 0, FLOAT16 = 1, INT8 = 2 };
 
-class trtNet
-{
+class trtNet {
 public:
   // Load from engine file
-  explicit trtNet(const std::string & engineFile);
+  explicit trtNet(const std::string &engineFile);
 
-  ~trtNet()
-  {
+  ~trtNet() {
     // Release the stream and the buffers
     cudaStreamSynchronize(mTrtCudaStream);
     cudaStreamDestroy(mTrtCudaStream);
-    for (auto & item : mTrtCudaBuffer) {
+    for (auto &item : mTrtCudaBuffer) {
       cudaFree(item);
     }
 
@@ -66,10 +63,9 @@ public:
     }
   }
 
-  void saveEngine(std::string fileName)
-  {
+  void saveEngine(std::string fileName) {
     if (mTrtEngine) {
-      nvinfer1::IHostMemory * data = mTrtEngine->serialize();
+      nvinfer1::IHostMemory *data = mTrtEngine->serialize();
       std::ofstream file;
       file.open(fileName, std::ios::binary | std::ios::out);
       if (!file.is_open()) {
@@ -77,37 +73,35 @@ public:
         return;
       }
 
-      file.write((const char *)data->data(), data->size());
+      file.write((const char *) data->data(), data->size());
       file.close();
     }
   }
 
-  void doInference(const void * inputData, void * outputData);
+  void doInference(const void *inputData, void *outputData);
 
-  inline size_t getInputSize()
-  {
+  inline size_t getInputSize() {
     return std::accumulate(
-      mTrtBindBufferSize.begin(), mTrtBindBufferSize.begin() + mTrtInputCount, 0);
+        mTrtBindBufferSize.begin(), mTrtBindBufferSize.begin() + mTrtInputCount, 0);
   }
 
-  inline size_t getOutputSize()
-  {
+  inline size_t getOutputSize() {
     return std::accumulate(
-      mTrtBindBufferSize.begin() + mTrtInputCount, mTrtBindBufferSize.end(), 0);
+        mTrtBindBufferSize.begin() + mTrtInputCount, mTrtBindBufferSize.end(), 0);
   }
 
 private:
   void InitEngine();
 
-  nvinfer1::IExecutionContext * mTrtContext;
-  nvinfer1::ICudaEngine * mTrtEngine;
-  nvinfer1::IRuntime * mTrtRunTime;
+  nvinfer1::IExecutionContext *mTrtContext;
+  nvinfer1::ICudaEngine *mTrtEngine;
+  nvinfer1::IRuntime *mTrtRunTime;
   cudaStream_t mTrtCudaStream;
   Profiler mTrtProfiler;
   RUN_MODE mTrtRunMode;
 
   std::vector<void *> mTrtCudaBuffer;
-  std::vector<int64_t> mTrtBindBufferSize;
+  std::vector <int64_t> mTrtBindBufferSize;
   int mTrtInputCount;
 };
 }  // namespace Tn

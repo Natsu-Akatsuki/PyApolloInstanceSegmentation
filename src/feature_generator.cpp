@@ -16,19 +16,17 @@
 
 #include "lidar_apollo_instance_segmentation/log_table.hpp"
 
-namespace
-{
+namespace {
 inline float normalizeIntensity(float intensity) { return intensity / 255.0f; }
 }  // namespace
 
 FeatureGenerator::FeatureGenerator(
-  const int width, const int height, const int range, const bool use_intensity_feature,
-  const bool use_constant_feature)
-: min_height_(-5.0),
-  max_height_(5.0),
-  use_intensity_feature_(use_intensity_feature),
-  use_constant_feature_(use_constant_feature)
-{
+    const int width, const int height, const int range, const bool use_intensity_feature,
+    const bool use_constant_feature)
+    : min_height_(-5.0),
+      max_height_(5.0),
+      use_intensity_feature_(use_intensity_feature),
+      use_constant_feature_(use_constant_feature) {
   // select feature map type
   if (use_constant_feature && use_intensity_feature) {
     map_ptr_ = std::make_shared<FeatureMapWithConstantAndIntensity>(width, height, range);
@@ -42,9 +40,8 @@ FeatureGenerator::FeatureGenerator(
   map_ptr_->initializeMap(map_ptr_->map_data);
 }
 
-std::shared_ptr<FeatureMapInterface> FeatureGenerator::generate(
-  const pcl::PointCloud<pcl::PointXYZI>::Ptr & pc_ptr)
-{
+std::shared_ptr <FeatureMapInterface> FeatureGenerator::generate(
+    const pcl::PointCloud<pcl::PointXYZI>::Ptr &pc_ptr) {
   const double epsilon = 1e-6;
   map_ptr_->resetMap(map_ptr_->map_data);
 

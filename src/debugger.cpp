@@ -21,65 +21,63 @@
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
 
-Debugger::Debugger(rclcpp::Node * node)
-{
+Debugger::Debugger(rclcpp::Node *node) {
   instance_pointcloud_pub_ =
-    node->create_publisher<sensor_msgs::msg::PointCloud2>("debug/instance_pointcloud", 1);
+      node->create_publisher<sensor_msgs::msg::PointCloud2>("debug/instance_pointcloud", 1);
 }
 
 void Debugger::publishColoredPointCloud(
-  const tier4_perception_msgs::msg::DetectedObjectsWithFeature & input)
-{
+    const tier4_perception_msgs::msg::DetectedObjectsWithFeature &input) {
   using autoware_auto_perception_msgs::msg::ObjectClassification;
-  pcl::PointCloud<pcl::PointXYZRGB> colored_pointcloud;
+  pcl::PointCloud <pcl::PointXYZRGB> colored_pointcloud;
   for (size_t i = 0; i < input.feature_objects.size(); i++) {
-    pcl::PointCloud<pcl::PointXYZI> object_pointcloud;
+    pcl::PointCloud <pcl::PointXYZI> object_pointcloud;
     pcl::fromROSMsg(input.feature_objects.at(i).feature.cluster, object_pointcloud);
 
     int red = 0, green = 0, blue = 0;
     switch (input.feature_objects.at(i).object.classification.front().label) {
-      case ObjectClassification::CAR: {
-        red = 255;
-        green = 0;
-        blue = 0;
-        break;
-      }
-      case ObjectClassification::TRUCK: {
-        red = 255;
-        green = 127;
-        blue = 0;
-        break;
-      }
-      case ObjectClassification::BUS: {
-        red = 255;
-        green = 0;
-        blue = 127;
-        break;
-      }
-      case ObjectClassification::PEDESTRIAN: {
-        red = 0;
-        green = 255;
-        blue = 0;
-        break;
-      }
-      case ObjectClassification::BICYCLE: {
-        red = 0;
-        green = 0;
-        blue = 255;
-        break;
-      }
-      case ObjectClassification::MOTORCYCLE: {
-        red = 0;
-        green = 127;
-        blue = 255;
-        break;
-      }
-      case ObjectClassification::UNKNOWN: {
-        red = 255;
-        green = 255;
-        blue = 255;
-        break;
-      }
+    case ObjectClassification::CAR: {
+      red = 255;
+      green = 0;
+      blue = 0;
+      break;
+    }
+    case ObjectClassification::TRUCK: {
+      red = 255;
+      green = 127;
+      blue = 0;
+      break;
+    }
+    case ObjectClassification::BUS: {
+      red = 255;
+      green = 0;
+      blue = 127;
+      break;
+    }
+    case ObjectClassification::PEDESTRIAN: {
+      red = 0;
+      green = 255;
+      blue = 0;
+      break;
+    }
+    case ObjectClassification::BICYCLE: {
+      red = 0;
+      green = 0;
+      blue = 255;
+      break;
+    }
+    case ObjectClassification::MOTORCYCLE: {
+      red = 0;
+      green = 127;
+      blue = 255;
+      break;
+    }
+    case ObjectClassification::UNKNOWN: {
+      red = 255;
+      green = 255;
+      blue = 255;
+      break;
+    }
     }
 
     for (size_t i = 0; i < object_pointcloud.size(); i++) {
