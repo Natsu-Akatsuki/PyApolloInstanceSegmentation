@@ -49,10 +49,6 @@
 #include "disjoint_set.hpp"
 #include "util.hpp"
 
-#include <std_msgs/msg/header.hpp>
-#include <tier4_perception_msgs/msg/detected_object_with_feature.hpp>
-#include <tier4_perception_msgs/msg/detected_objects_with_feature.hpp>
-
 #include <pcl/PointIndices.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
@@ -79,7 +75,7 @@ struct Obstacle {
   std::vector<float> meta_type_probs;
 
   Obstacle() : score(0.0), height(-5.0), heading(0.0), meta_type(META_UNKNOWN) {
-    cloud_ptr.reset(new pcl::PointCloud <pcl::PointXYZI>);
+    cloud_ptr.reset(new pcl::PointCloud<pcl::PointXYZI>);
     meta_type_probs.assign(MAX_META_TYPE, 0.0);
   }
 };
@@ -98,12 +94,8 @@ public:
   void filter(const std::shared_ptr<float> &inferred_data);
   void classify(const std::shared_ptr<float> &inferred_data);
 
-  void getObjects(
-      const float confidence_thresh, const float height_thresh, const int min_pts_num,
-      tier4_perception_msgs::msg::DetectedObjectsWithFeature &objects,
-      const std_msgs::msg::Header &in_header);
-  tier4_perception_msgs::msg::DetectedObjectWithFeature obstacleToObject(
-      const Obstacle &in_obstacle, const std_msgs::msg::Header &in_header);
+  void getObjects(const float confidence_thresh, const float height_thresh, const int min_pts_num,
+                  std::vector<int> &cluster_indices);
 
 private:
   int rows_;
@@ -114,7 +106,7 @@ private:
   float inv_res_x_;
   float inv_res_y_;
   std::vector<int> point2grid_;
-  std::vector <Obstacle> obstacles_;
+  std::vector<Obstacle> obstacles_;
   std::vector<int> id_img_;
 
   pcl::PointCloud<pcl::PointXYZI>::Ptr pc_ptr_;

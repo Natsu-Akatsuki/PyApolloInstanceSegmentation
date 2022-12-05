@@ -46,22 +46,6 @@
 
 #include "lidar_apollo_instance_segmentation/cluster2d.hpp"
 
-#include <autoware_auto_perception_msgs/msg/detected_object_kinematics.hpp>
-#include <autoware_auto_perception_msgs/msg/object_classification.hpp>
-
-#include <pcl_conversions/pcl_conversions.h>
-#ifdef ROS_DISTRO_GALACTIC
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
-#else
-#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
-#endif
-
-geometry_msgs::msg::Quaternion getQuaternionFromRPY(const double r, const double p, const double y) {
-  tf2::Quaternion q;
-  q.setRPY(r, p, y);
-  return tf2::toMsg(q);
-}
-
 Cluster2D::Cluster2D(const int rows, const int cols, const float range) {
   rows_ = rows;
   cols_ = cols;
@@ -77,7 +61,7 @@ Cluster2D::Cluster2D(const int rows, const int cols, const float range) {
 }
 
 void Cluster2D::traverse(Node *x) {
-  std::vector < Node * > p;
+  std::vector<Node *> p;
   p.clear();
 
   while (x->traversed == 0) {
@@ -108,7 +92,7 @@ void Cluster2D::cluster(
 
   pc_ptr_ = pc_ptr;
 
-  std::vector <std::vector<Node>> nodes(rows_, std::vector<Node>(cols_, Node()));
+  std::vector<std::vector<Node>> nodes(rows_, std::vector<Node>(cols_, Node()));
 
   valid_indices_in_pc_ = &(valid_indices.indices);
   point2grid_.assign(valid_indices_in_pc_->size(), -1);
@@ -214,7 +198,7 @@ void Cluster2D::filter(const std::shared_ptr<float> &inferred_data) {
     obs->score = score / static_cast<double>(obs->grids.size());
     obs->height = height / static_cast<double>(obs->grids.size());
     obs->heading = std::atan2(vec_y, vec_x) * 0.5;
-    obs->cloud_ptr.reset(new pcl::PointCloud <pcl::PointXYZI>);
+    obs->cloud_ptr.reset(new pcl::PointCloud<pcl::PointXYZI>);
   }
 }
 
@@ -241,101 +225,13 @@ void Cluster2D::classify(const std::shared_ptr<float> &inferred_data) {
   }
 }
 
-tier4_perception_msgs::msg::DetectedObjectWithFeature Cluster2D::obstacleToObject(
-    const Obstacle &in_obstacle, const std_msgs::msg::Header &in_header) {
-  using autoware_auto_perception_msgs::msg::DetectedObjectKinematics;
-  using autoware_auto_perception_msgs::msg::ObjectClassification;
-
-  tier4_perception_msgs::msg::DetectedObjectWithFeature resulting_object;
-  // pcl::PointCloud<pcl::PointXYZI> in_cluster = *(in_obstacle.cloud_ptr);
-
-  resulting_object.object.classification.emplace_back(
-      autoware_auto_perception_msgs::build<ObjectClassification>()
-          .label(ObjectClassification::UNKNOWN)
-          .probability(in_obstacle.score));
-  if (in_obstacle.meta_type == MetaType::META_PEDESTRIAN) {
-    resulting_object.object.classification.front().label = ObjectClassification::PEDESTRIAN;
-  } else if (in_obstacle.meta_type == MetaType::META_NON_MOT) {
-    resulting_object.object.classification.front().label = ObjectClassification::MOTORCYCLE;
-  } else if (in_obstacle.meta_type == MetaType::META_SMALL_MOT) {
-    resulting_object.object.classification.front().label = ObjectClassification::CAR;
-  } else if (in_obstacle.meta_type == MetaType::META_BIG_MOT) {
-    resulting_object.object.classification.front().label = ObjectClassification::BUS;
-  } else {
-    // resulting_object.object.classification.front().label = ObjectClassification::PEDESTRIAN;
-    resulting_object.object.classification.front().label = ObjectClassification::UNKNOWN;
-  }
-
-  pcl::PointXYZ min_point;
-  pcl::PointXYZ max_point;
-  for (auto pit = in_obstacle.cloud_ptr->points.begin(); pit != in_obstacle.cloud_ptr->points.end();
-       ++pit) {
-    if (pit->x < min_point.x) {
-      min_point.x = pit->x;
-    }
-    if (pit->y < min_point.y) {
-      min_point.y = pit->y;
-    }
-    if (pit->z < min_point.z) {
-      min_point.z = pit->z;
-    }
-    if (pit->x > max_point.x) {
-      max_point.x = pit->x;
-    }
-    if (pit->y > max_point.y) {
-      max_point.y = pit->y;
-    }
-    if (pit->z > max_point.z) {
-      max_point.z = pit->z;
-    }
-  }
-
-  // cluster and ground filtering
-  pcl::PointCloud <pcl::PointXYZI> cluster;
-  const float min_height = min_point.z + ((max_point.z - min_point.z) * 0.1f);
-  for (auto pit = in_obstacle.cloud_ptr->points.begin(); pit != in_obstacle.cloud_ptr->points.end();
-       ++pit) {
-    if (min_height < pit->z) {
-      cluster.points.push_back(*pit);
-    }
-  }
-  min_point.z = 0.0;
-  max_point.z = 0.0;
-  for (auto pit = cluster.points.begin(); pit != cluster.points.end(); ++pit) {
-    if (pit->z < min_point.z) {
-      min_point.z = pit->z;
-    }
-    if (pit->z > max_point.z) {
-      max_point.z = pit->z;
-    }
-  }
-  sensor_msgs::msg::PointCloud2 ros_pc;
-  pcl::toROSMsg(cluster, ros_pc);
-  resulting_object.feature.cluster = ros_pc;
-  resulting_object.feature.cluster.header = in_header;
-
-  // position
-  const float height = max_point.z - min_point.z;
-  const float length = max_point.x - min_point.x;
-  const float width = max_point.y - min_point.y;
-  resulting_object.object.kinematics.pose_with_covariance.pose.position.x =
-      min_point.x + length / 2;
-  resulting_object.object.kinematics.pose_with_covariance.pose.position.y = min_point.y + width / 2;
-  resulting_object.object.kinematics.pose_with_covariance.pose.position.z =
-      min_point.z + height / 2;
-
-  resulting_object.object.kinematics.pose_with_covariance.pose.orientation =
-      getQuaternionFromRPY(0.0, 0.0, in_obstacle.heading);
-  resulting_object.object.kinematics.orientation_availability =
-      DetectedObjectKinematics::SIGN_UNKNOWN;
-
-  return resulting_object;
-}
-
 void Cluster2D::getObjects(
     const float confidence_thresh, const float height_thresh, const int min_pts_num,
-    tier4_perception_msgs::msg::DetectedObjectsWithFeature &objects,
-    const std_msgs::msg::Header &in_header) {
+    std::vector<int> &cluster_idx) {
+
+  cluster_idx.resize(point2grid_.size());
+  cluster_idx.assign(point2grid_.size(), -1);
+
   for (size_t i = 0; i < point2grid_.size(); ++i) {
     int grid = point2grid_[i];
     if (grid < 0) {
@@ -343,7 +239,6 @@ void Cluster2D::getObjects(
     }
 
     int obstacle_id = id_img_[grid];
-
     int point_id = valid_indices_in_pc_->at(i);
 
     if (obstacle_id >= 0 && obstacles_[obstacle_id].score >= confidence_thresh) {
@@ -351,18 +246,8 @@ void Cluster2D::getObjects(
           height_thresh < 0 ||
               pc_ptr_->points[point_id].z <= obstacles_[obstacle_id].height + height_thresh) {
         obstacles_[obstacle_id].cloud_ptr->push_back(pc_ptr_->points[point_id]);
+        cluster_idx[point_id] = obstacle_id;
       }
     }
   }
-
-  for (size_t obstacle_id = 0; obstacle_id < obstacles_.size(); obstacle_id++) {
-    Obstacle *obs = &obstacles_[obstacle_id];
-    if (static_cast<int>(obs->cloud_ptr->size()) < min_pts_num) {
-      continue;
-    }
-    tier4_perception_msgs::msg::DetectedObjectWithFeature out_obj =
-        obstacleToObject(*obs, in_header);
-    objects.feature_objects.push_back(out_obj);
-  }
-  objects.header = in_header;
 }

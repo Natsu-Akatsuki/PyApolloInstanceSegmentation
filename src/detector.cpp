@@ -18,34 +18,42 @@
 
 #include <NvCaffeParser.h>
 #include <NvInfer.h>
-#include <pcl_conversions/pcl_conversions.h>
-
-LidarApolloInstanceSegmentation::LidarApolloInstanceSegmentation(rclcpp::Node *node)
-    : node_(node), tf_buffer_(node_->get_clock()), tf_listener_(tf_buffer_) {
+#include <filesystem>
+#include "yaml-cpp/yaml.h"
+#include <pybind11/embed.h>
+LidarApolloInstanceSegmentation::LidarApolloInstanceSegmentation() {
   int range, width, height;
   bool use_intensity_feature, use_constant_feature;
   std::string engine_file;
   std::string prototxt_file;
   std::string caffemodel_file;
-  score_threshold_ = node_->declare_parameter("score_threshold", 0.8);
-  range = node_->declare_parameter("range", 60);
-  width = node_->declare_parameter("width", 640);
-  height = node_->declare_parameter("height", 640);
-  engine_file = node_->declare_parameter("engine_file", "vls-128.engine");
-  prototxt_file = node_->declare_parameter("prototxt_file", "vls-128.prototxt");
-  caffemodel_file = node_->declare_parameter("caffemodel_file", "vls-128.caffemodel");
-  use_intensity_feature = node_->declare_parameter("use_intensity_feature", true);
-  use_constant_feature = node_->declare_parameter("use_constant_feature", true);
-  target_frame_ = node_->declare_parameter("target_frame", "base_link");
-  z_offset_ = node_->declare_parameter<float>("z_offset", -2.0);
+
+  std::filesystem::path file_path(__FILE__);
+  auto dir_path = file_path.parent_path().parent_path();
+  auto config_path = std::string(dir_path / "config" / "vlp-16.param.yaml");
+  fmt::print(fg(fmt::color::green), "[INFO] load config file {}.\n", config_path);
+  YAML::Node config = YAML::LoadFile(config_path);
+  score_threshold_ = config["score_threshold"].as<float>();
+  range = config["range"].as<int>();
+  width = config["width"].as<int>();
+  height = config["height"].as<int>();
+  use_intensity_feature = config["use_intensity_feature"].as<bool>();
+  use_constant_feature = config["use_constant_feature"].as<bool>();
+  engine_file = config["engine_file"].as<std::string>();
+  prototxt_file = config["prototxt_file"].as<std::string>();
+  caffemodel_file = config["caffemodel_file"].as<std::string>();
+
+  engine_file = std::string(dir_path / engine_file);
+  prototxt_file = std::string(dir_path / prototxt_file);
+  caffemodel_file = std::string(dir_path / caffemodel_file);
 
   // load weight file
   std::ifstream fs(engine_file);
   if (!fs.is_open()) {
-    RCLCPP_INFO(
-        node_->get_logger(),
-        "Could not find %s. try making TensorRT engine from caffemodel and prototxt",
-        engine_file.c_str());
+    fmt::print(fg(fmt::color::red),
+               "[ERROR] Could not find {}. try making TensorRT engine from caffemodel and prototxt\n",
+               engine_file);
+
     Tn::Logger logger;
     nvinfer1::IBuilder *builder = nvinfer1::createInferBuilder(logger);
     nvinfer1::INetworkDefinition *network = builder->createNetworkV2(0U);
@@ -56,7 +64,7 @@ LidarApolloInstanceSegmentation::LidarApolloInstanceSegmentation(rclcpp::Node *n
     std::string output_node = "deconv0";
     auto output = blob_name2tensor->find(output_node.c_str());
     if (output == nullptr) {
-      RCLCPP_ERROR(node_->get_logger(), "can not find output named %s", output_node.c_str());
+      fmt::print(fg(fmt::color::red), "[ERROR] can not find output named {}\n", output_node);
     }
     network->markOutput(*output);
 #if (NV_TENSORRT_MAJOR * 1000) + (NV_TENSORRT_MINOR * 100) + NV_TENSOR_PATCH >= 8400
@@ -96,56 +104,20 @@ LidarApolloInstanceSegmentation::LidarApolloInstanceSegmentation(rclcpp::Node *n
   cluster2d_ = std::make_shared<Cluster2D>(width, height, range);
 }
 
-bool LidarApolloInstanceSegmentation::transformCloud(
-    const sensor_msgs::msg::PointCloud2 &input, sensor_msgs::msg::PointCloud2 &transformed_cloud,
-    float z_offset) {
-  // TODO(mitsudome-r): remove conversion once pcl_ros transform are available.
-  pcl::PointCloud <pcl::PointXYZI> pcl_input, pcl_transformed_cloud;
-  pcl::fromROSMsg(input, pcl_input);
-
-  // transform pointcloud to target_frame
-  if (target_frame_ != input.header.frame_id) {
-    try {
-      geometry_msgs::msg::TransformStamped transform_stamped;
-      transform_stamped = tf_buffer_.lookupTransform(
-          target_frame_, input.header.frame_id, input.header.stamp, std::chrono::milliseconds(500));
-      Eigen::Matrix4f affine_matrix =
-          tf2::transformToEigen(transform_stamped.transform).matrix().cast<float>();
-      pcl::transformPointCloud(pcl_input, pcl_transformed_cloud, affine_matrix);
-      transformed_cloud.header.frame_id = target_frame_;
-      pcl_transformed_cloud.header.frame_id = target_frame_;
-    } catch (tf2::TransformException &ex) {
-      RCLCPP_WARN(node_->get_logger(), "%s", ex.what());
-      return false;
-    }
-  } else {
-    pcl_transformed_cloud = pcl_input;
+std::vector<int> LidarApolloInstanceSegmentation::detectDynamicObjects(const pybind11::array_t<float> &input) {
+  // convert from py::array to pcl
+  auto input_ref = input.unchecked<2>();
+  pcl::PointCloud<pcl::PointXYZI>::Ptr
+      pcl_pointcloud_raw_ptr(new pcl::PointCloud<pcl::PointXYZI>(input_ref.shape(0), 1));
+  for (int i = 0; i < input_ref.shape(0); ++i) {
+    pcl_pointcloud_raw_ptr->points[i].x = input_ref(i, 0);
+    pcl_pointcloud_raw_ptr->points[i].y = input_ref(i, 1);
+    pcl_pointcloud_raw_ptr->points[i].z = input_ref(i, 2);
+    pcl_pointcloud_raw_ptr->points[i].intensity = input_ref(i, 3);
   }
 
-  // move pointcloud z_offset in z axis
-  pcl::PointCloud <pcl::PointXYZI> pointcloud_with_z_offset;
-  Eigen::Affine3f z_up_translation(Eigen::Translation3f(0, 0, z_offset));
-  Eigen::Matrix4f z_up_transform = z_up_translation.matrix();
-  pcl::transformPointCloud(pcl_transformed_cloud, pcl_transformed_cloud, z_up_transform);
-
-  pcl::toROSMsg(pcl_transformed_cloud, transformed_cloud);
-
-  return true;
-}
-
-bool LidarApolloInstanceSegmentation::detectDynamicObjects(
-    const sensor_msgs::msg::PointCloud2 &input,
-    tier4_perception_msgs::msg::DetectedObjectsWithFeature &output) {
-  // move up pointcloud z_offset in z axis
-  sensor_msgs::msg::PointCloud2 transformed_cloud;
-  transformCloud(input, transformed_cloud, z_offset_);
-
-  // convert from ros to pcl
-  pcl::PointCloud<pcl::PointXYZI>::Ptr pcl_pointcloud_raw_ptr(new pcl::PointCloud <pcl::PointXYZI>);
-  pcl::fromROSMsg(transformed_cloud, *pcl_pointcloud_raw_ptr);
-
   // generate feature map
-  std::shared_ptr <FeatureMapInterface> feature_map_ptr =
+  std::shared_ptr<FeatureMapInterface> feature_map_ptr =
       feature_generator_->generate(pcl_pointcloud_raw_ptr);
 
   // inference
@@ -162,16 +134,24 @@ bool LidarApolloInstanceSegmentation::detectDynamicObjects(
       true /*use all grids for clustering*/);
   const float height_thresh = 0.5;
   const int min_pts_num = 3;
+  std::vector<int> output;
   cluster2d_->getObjects(
-      score_threshold_, height_thresh, min_pts_num, output, transformed_cloud.header);
+      score_threshold_, height_thresh, min_pts_num, output);
 
-  // move down pointcloud z_offset in z axis
-  for (std::size_t i = 0; i < output.feature_objects.size(); i++) {
-    sensor_msgs::msg::PointCloud2 transformed_cloud;
-    transformCloud(output.feature_objects.at(i).feature.cluster, transformed_cloud, -z_offset_);
-    output.feature_objects.at(i).feature.cluster = transformed_cloud;
-  }
+  return output;
+}
 
-  output.header = transformed_cloud.header;
-  return true;
+// int main(int argc, char **argv) {
+//   pybind11::scoped_interpreter guard{};
+//   LidarApolloInstanceSegmentation lidar_apollo_instance_segmentation;
+//   lidar_apollo_instance_segmentation.detectDynamicObjects();
+// }
+
+PYBIND11_MODULE(lidar_apollo_instance_segmentation_pyb, m) {
+  m.doc() = "pybind11 for apollo instance segmentation";
+  pybind11::class_<LidarApolloInstanceSegmentation>(m, "LidarApolloInstanceSegmentation")
+      .def(pybind11::init<>())
+      .def("segmentation",
+           &LidarApolloInstanceSegmentation::detectDynamicObjects,
+           "apollo instance segmentation", pybind11::arg("input"));
 }
